@@ -47,6 +47,12 @@ then
     READLINK="readlink"
 fi
 
+if [ $# -lt 2 ]
+then
+    2>&1 echo "usage: `basename $0` <base-output-filename> <cmd> [ arg1 arg2 ... ]"
+    exit 1
+fi
+
 OUT_BASE_FNAME="$1"
 shift
 
