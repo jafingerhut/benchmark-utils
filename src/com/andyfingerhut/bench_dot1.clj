@@ -1,12 +1,10 @@
 (ns com.andyfingerhut.bench-dot1
   (:require [criterium.core :as crit]
-            [com.andyfingerhut.process :as p]))
+            [com.andyfingerhut.bench :as b]))
 
-(def n 100000)
-
-(println "pid:" (p/process-id))
-(println "Clojure version:" (clojure-version))
+(b/print-common-info)
 (println "===== Clojure vectors of boxed doubles =====")
+(def n 100000)
 (def cvx (vec (map double (range n))))
 (def cvy (vec (map double (range n))))
 (println "(class cvx)=" (class cvx))
