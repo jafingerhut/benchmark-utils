@@ -55,4 +55,10 @@ then
     exit 1
 fi
 
-TZ=UTC ts 'UTC %Y-%m-%d %H:%M:%.S top: '
+if [ $# -eq 1 ]
+then
+    EXTRA_STRING="$1"
+    TZ=UTC ts "UTC %Y-%m-%d %H:%M:%.S ${EXTRA_STRING}"
+else
+    TZ=UTC ts "UTC %Y-%m-%d %H:%M:%.S"
+fi
