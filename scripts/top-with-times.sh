@@ -37,7 +37,7 @@ then
     top -l 0 -s 2 | TZ=UTC ts 'UTC %Y-%m-%d %H:%M:%S%.S top: '
 elif [ `get_os` == "ubuntu" ]
 then
-    top -b -d 2 | TZ=UTC ts 'UTC %Y-%m-%d %H:%M:%S top: '
+    top -b   -d 2 | TZ=UTC ts 'UTC %Y-%m-%d %H:%M:%S%.S top: '
 else
     2>&1 echo "Unknown OS not supported by this script."
     exit 1
