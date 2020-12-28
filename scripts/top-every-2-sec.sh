@@ -46,13 +46,27 @@ function get_os() {
   done
 }
 
+WRITE_TOP_PID=0
+if [ $# -eq 1 ]
+then
+    WRITE_TOP_PID=1
+    OUT_FNAME="$1"
+fi
+
 if [ `get_os` == "osx" ]
 then
-    top -l 0 -s 2
+    top -l 0 -s 2 &
+    TOP_PID=$!
 elif [ `get_os` == "ubuntu" ]
 then
-    top -b -d 2
+    top -b -d 2 &
+    TOP_PID=$!
 else
     2>&1 echo "Unknown OS not supported by this script."
     exit 1
+fi
+
+if [ $WRITE_TOP_PID -eq 1 ]
+then
+    echo $! > "${OUT_FNAME}"
 fi
