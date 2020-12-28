@@ -19,14 +19,9 @@
 # %M minute as a decimal number with leading 0, range 00 to 59
 # %S second as a decimal number with leading 0, range 00 to 60 to
 #     allow for occasional leap seconds
-# %.S microseconds as a decimal number with leading 0, range 000000 to
-#     999999
-
-# top -b -d 2 -p <pid> | TZ=UTC ts 'UTC %Y-%m-%d %H:%M:%S%.S'
-
-# After `brew install moreutils` on macOS:
-
-# /usr/bin/top -l 5 -s 2 -pid 24043 | TZ=UTC ts 'UTC %Y-%m-%d %H:%M:%S%.S'
+# OR:
+# %.S seconds plus microseconds as a decimal number with leading 0,
+#     range 00.000000 to 60.999999
 
 is_osx () 
 { 
@@ -60,4 +55,4 @@ then
     exit 1
 fi
 
-TZ=UTC ts 'UTC %Y-%m-%d %H:%M:%S%.S top: '
+TZ=UTC ts 'UTC %Y-%m-%d %H:%M:%.S top: '
