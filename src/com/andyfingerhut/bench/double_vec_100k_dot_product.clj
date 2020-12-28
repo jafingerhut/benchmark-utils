@@ -37,7 +37,7 @@
 
 (defn java-array-boxed-doubles [_]
   (b/print-common-info)
-  (println "===== Java arrays of primitive doubles =====")
+  (println "===== Java arrays of boxed doubles, compute using areduce =====")
   (let [cax (object-array (map double (range n)))
         cay (object-array (map double (range n)))]
     (println "(class cax)=" (class cax))
