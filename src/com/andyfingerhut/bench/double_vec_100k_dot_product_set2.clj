@@ -17,6 +17,12 @@
 
 (def n 100000)
 
+(defn p+ ^double [^double x ^double y]
+  (+ x y))
+
+(defn p* ^double [^double x ^double y]
+  (* x y))
+
 (defn neanderthal-double-vectors-fluokitten-foldmap [_]
   (b/print-common-info)
   (println "===== Neanderthal double vectors, compute using fluokitten foldmap =====")
