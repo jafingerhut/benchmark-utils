@@ -1,2 +1,14 @@
 {:deps {criterium/criterium {:mvn/version "0.4.6"}
-        uncomplicate/neanderthal {:mvn/version "0.24.0"}}}
+        uncomplicate/neanderthal {:mvn/version "0.39.0"}
+        ;; Optional. If bytedeco is not present, a system-wide MKL is used.
+        org.bytedeco/mkl-platform-redist {:mvn/version "2020.1-1.5.3"}}
+ :jvm-opts {"-XX:-OmitStackTraceInFastThrow"
+            ;; If on Java 9+, you may need to uncomment the following
+            ;; JVM option.
+            ;;"--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED"
+            }
+ :aliases
+ {;; - start a Clojure/Java Socket REPL on port 50505
+  :socket
+  {:jvm-opts
+   ["-Dclojure.server.repl={:port,50505,:accept,clojure.core.server/repl}"]}}}
