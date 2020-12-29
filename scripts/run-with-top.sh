@@ -84,6 +84,6 @@ clean_up() {
 # Kill the child process
 trap clean_up SIGHUP SIGINT SIGTERM
 
-"$*" | "${THIS_SCRIPT_DIR_ABSOLUTE}/prepend-times.sh" log: > "${OUT_LOG_FNAME}"
+$* | "${THIS_SCRIPT_DIR_ABSOLUTE}/prepend-times.sh" log: > "${OUT_LOG_FNAME}"
 
 clean_up
