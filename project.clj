@@ -1,9 +1,9 @@
 (defproject benchmark-utils "0.1.0"
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [criterium "0.4.6"]
-                 [uncomplicate/neanderthal "0.35.0"]
+                 [uncomplicate/neanderthal "0.39.0"]
                  ;;Optional. If bytedeco is not present, a system-wide MKL is used.
-                 [org.bytedeco/mkl-platform-redist "2020.1-1.5.3"]]
+                 [org.bytedeco/mkl-platform-redist "2020.3-1.5.4"]]
   ;; If on Java 9+, you have to uncomment the following JVM option.
   :jvm-opts ^:replace [#_"--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED"]
   :profiles {:socket {:jvm-opts ["-Dclojure.server.repl={:port,50505,:accept,clojure.core.server/repl}"]}})
