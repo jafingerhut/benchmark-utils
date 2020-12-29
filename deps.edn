@@ -23,4 +23,8 @@
   :macos
   {:extra-deps
    {org.jcuda/jcuda-natives$apple-x86_64 {:mvn/version "10.2.0"}
-    org.jcuda/jcublas-natives$apple-x86_64 {:mvn/version "10.2.0"}}}}}
+    org.jcuda/jcublas-natives$apple-x86_64 {:mvn/version "10.2.0"}}}
+  :cljol
+  {:extra-deps
+   {cljol/cljol {:git/url "https://github.com/jafingerhut/cljol"
+                 :sha "dc17a8e02f5abf7aacf6c1962c627fe7b19993d0"}}}}}
