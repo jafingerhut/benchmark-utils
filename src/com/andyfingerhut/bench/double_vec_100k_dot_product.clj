@@ -5,6 +5,8 @@
             [uncomplicate.neanderthal.core :as nc]
             [com.andyfingerhut.bench :as b]))
 
+(set! *warn-on-reflection* true)
+
 (def n 100000)
 
 (defn clojure-persistent-vector [_]
@@ -21,7 +23,7 @@
        (reduce + (map * cvx cvy))
        :verbose))))
 
-(defn clojure-gvec-primitive-sdouble [_]
+(defn clojure-gvec-primitive-doubles [_]
   (b/print-common-info)
   (println "===== Clojure persistent vectors of primitive doubles =====")
   (let [cvx (apply vector-of :double (map double (range n)))

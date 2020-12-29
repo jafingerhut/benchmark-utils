@@ -2,7 +2,7 @@
 
 java -version 2>&1
 clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product/clojure-persistent-vector
-clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product/clojure-gvec-primitive-sdouble
+clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product/clojure-gvec-primitive-doubles
 clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product/java-array-boxed-doubles
 clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product/java-array-primitive-doubles-areduce
 clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product/java-array-primitive-doubles-fluokitten-foldmap
