@@ -1,6 +1,5 @@
 {:deps {criterium/criterium {:mvn/version "0.4.6"}
         uncomplicate/neanderthal {:mvn/version "0.39.0"}
-        ;; Optional. If bytedeco is not present, a system-wide MKL is used.
         org.bytedeco/mkl-platform-redist {:mvn/version "2020.1-1.5.3"}}
  :jvm-opts ["-XX:-OmitStackTraceInFastThrow"
             ;; If on Java 9+, you may need to uncomment the following
@@ -11,4 +10,17 @@
  {;; - start a Clojure/Java Socket REPL on port 50505
   :socket
   {:jvm-opts
-   ["-Dclojure.server.repl={:port,50505,:accept,clojure.core.server/repl}"]}}}
+   ["-Dclojure.server.repl={:port,50505,:accept,clojure.core.server/repl}"]}
+  ;; Clojure CLI tools cannot infer the dependencies below automatically
+  ;; (when running on macOS 10.14.6) from only the
+  ;; org.bytedeco/mkl-platform-redist dependency above.  Leiningen on
+  ;; the same machine can resolve these dependencies successfully,
+  ;; apparently using something called 'classifiers' in Maven.  See
+  ;; comments in the project.clj file for what deps Leiningen
+  ;; successfully finds on a macOS 10.14.6 system.  Using the :macos
+  ;; alias when running on macOS systems with Intel processors should
+  ;; help.
+  :macos
+  {:extra-deps
+   {org.jcuda/jcuda-natives$apple-x86_64 {:mvn/version "10.2.0"}
+    org.jcuda/jcublas-natives$apple-x86_64 {:mvn/version "10.2.0"}}}}}
