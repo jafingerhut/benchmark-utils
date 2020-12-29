@@ -119,4 +119,5 @@
     (crit/with-progress-reporting
       (crit/bench
        (nc/dot nx ny)
-       :verbose))))
+       :verbose)))
+  (shutdown-agents))
