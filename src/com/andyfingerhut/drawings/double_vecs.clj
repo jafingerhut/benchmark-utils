@@ -47,11 +47,20 @@
   (println "===== Neanderthal double vector =====")
   (let [nx (nn/dv (range n))]
     (graph-with-and-wo-doubles
-     [cax] (str "neanderthal-double-vector-" n) opts)))
+     [nx] (str "neanderthal-double-vector-" n) opts)))
+
+(defn neanderthal-2-double-vectors [_]
+  (println "===== Neanderthal 2 double vectors (to see if they share any objects) =====")
+  (let [nx (nn/dv (range n))
+        ny (nn/dv (range n))]
+    (graph-with-and-wo-doubles
+     [nx ny] (str "neanderthal-2-double-vector-" n) opts)))
 
 (defn draw-all [m]
   (clojure-persistent-vector m)
   (clojure-gvec-primitive-doubles m)
   (java-array-boxed-doubles m)
   (java-array-primitive-doubles m)
-  (neanderthal-double-vector m))
+  (neanderthal-double-vector m)
+  (neanderthal-2-double-vectors m)
+  (shutdown-agents))
