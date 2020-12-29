@@ -1,9 +1,12 @@
 (ns com.andyfingerhut.bench.double-vec-100k-dot-product
   (:require [criterium.core :as crit]
             [uncomplicate.fluokitten.core :as fk]
-            [uncomplicate.neanderthal.native :as nn]
-            [uncomplicate.neanderthal.core :as nc]
             [com.andyfingerhut.bench :as b]))
+
+;; This namespace is only for benchmarks that do not require the
+;; Neanderthal library.  See namespace
+;; com.andyfingerhut.bench.double-vec-100k-dot-product-set2 for tests
+;; that do require that library.
 
 (set! *warn-on-reflection* true)
 
@@ -92,32 +95,3 @@
       (crit/bench
        (fk/foldmap p+ 0.0 p* cax cay)
        :verbose))))
-
-(defn neanderthal-double-vectors-fluokitten-foldmap [_]
-  (b/print-common-info)
-  (println "===== Neanderthal double vectors, compute using fluokitten foldmap =====")
-  (let [nx (nn/dv (range n))
-        ny (nn/dv (range n))]
-    (println "(class nx)=" (class nx))
-    (println "dot product calculated by: (foldmap p+ 0.0 p* nx ny)")
-    (println "dot product result:"
-             (fk/foldmap p+ 0.0 p* nx ny))
-    (crit/with-progress-reporting
-      (crit/bench
-       (fk/foldmap p+ 0.0 p* nx ny)
-       :verbose))))
-
-(defn neanderthal-double-vectors-mkl-dot [_]
-  (b/print-common-info)
-  (println "===== Neanderthal double vectors, compute using Intel MKL dot =====")
-  (let [nx (nn/dv (range n))
-        ny (nn/dv (range n))]
-    (println "(class nx)=" (class nx))
-    (println "dot product calculated by: (nc/dot nx ny)")
-    (println "dot product result:"
-             (nc/dot nx ny))
-    (crit/with-progress-reporting
-      (crit/bench
-       (nc/dot nx ny)
-       :verbose)))
-  (shutdown-agents))

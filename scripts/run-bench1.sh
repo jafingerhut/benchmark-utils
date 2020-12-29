@@ -6,5 +6,5 @@ clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product/clojure-gvec-
 clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product/java-array-boxed-doubles
 clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product/java-array-primitive-doubles-areduce
 clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product/java-array-primitive-doubles-fluokitten-foldmap
-clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product/neanderthal-double-vectors-fluokitten-foldmap
-clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product/neanderthal-double-vectors-mkl-dot
+clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product-set2/neanderthal-double-vectors-fluokitten-foldmap
+clojure -X:clj com.andyfingerhut.bench.double-vec-100k-dot-product-set2/neanderthal-double-vectors-mkl-dot
