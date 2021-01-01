@@ -105,8 +105,42 @@ x
 )
 
 (defn parse-and-check-timestamps
-  "Given a sequence of lines, possibly read from a file:
-  TBD"
+  "Given a sequence of lines, possibly read from a file, attempt to
+  parse a date and time string at the beginning of every line.
+
+  If any problems are found, then a map is returned with at least
+  these keys:
+
+  :error - a keyword describing what kind of problem was found.
+
+  :error-data - some data structure, which can differ from one value
+  of :error to another, giving more detail about what line or lines
+  the error was found in.
+
+  If no problems are found, then return a sequence of maps, one
+  describing each line's contents, each having these keys:
+
+  :line - a string containing the original input line.
+
+  :linenum - integer line numbers, starting with the first being line
+  number 1.
+
+  :timestamp-str - the beginning part of the input line that is the
+  time and date representation.
+
+  :localdatetime - the string in :timestamp-str parsed as a date and
+  time, and returned as a java.time LocalDateTime object.
+
+  :origin - the origin of the log line, e.g. the top program, or a
+  separate JVM process performing benchmarking.
+
+  :usec - an integer number of microseconds of this line's timestamp,
+  after the first line's timestamp.  This value is 0 if the two line's
+  timestamps are the same, or negative if the later line's timestamp
+  is earlier than the first line's timestamp.
+
+  :rest-of-str - The rest of the input line after the timestamp and
+  origin strings have been removed."
   [lines]
   (let [lms (->> lines
                  ;; seq of strings -> seq of maps with
@@ -226,6 +260,20 @@ x
 (comment
 (def l1 "%Cpu(s): 20.7 us,  0.5 sy,  0.0 ni, 78.8 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st")
 (pprint (parse-top-total-cpu-use-line l1))
+)
+
+(defn parse-top-total-mem-use-line [s]
+  (let [m (re-find #"^\s*KiB Mem\s*:\s*(\d+)\s+total\s*,\s*(\d+)\s+free\s*,\s*(\d+)\s+used\s*,\s*(\d+)\s+buff/cache\s*$"
+                   s)]
+    (if m
+      {:total-mem-kib (Long/parseLong (m 1))
+       :free-mem-kib (Long/parseLong (m 2))
+       :used-mem-kib (Long/parseLong (m 3))
+       :cache-mem-kib (Long/parseLong (m 4))})))
+
+(comment
+(def l1 "KiB Mem :  4030264 total,   547848 free,   829628 used,  2652788 buff/cache")
+(pprint (parse-top-total-mem-use-line l1))
 )
 
 ;; Source: Ubuntu 18.04.5 Linux man page for top
@@ -430,6 +478,9 @@ x
         total-cpu-use-info (some #(parse-top-total-cpu-use-line
                                    (:rest-of-str %))
                                  up-to-hdr)
+        total-mem-use-info (some #(parse-top-total-mem-use-line
+                                   (:rest-of-str %))
+                                 up-to-hdr)
         after-hdr (remove (fn [lm] (str/blank? (:rest-of-str lm))) after-hdr)
         proc-infos (mapv (fn [lm]
                            {:line-info lm
@@ -449,6 +500,10 @@ x
       {:error :no-total-cpu-use-line,
        :error-data up-to-hdr}
 
+      (nil? total-mem-use-info)
+      {:error :no-total-mem-use-line,
+       :error-data up-to-hdr}
+
       first-nil-proc-info
       {:error :unrecognized-process-info-line
        :error-data first-nil-proc-info}
@@ -461,6 +516,8 @@ x
       {:top-heading-lines up-to-hdr,
        :top-process-lines after-hdr,
        :usec (:usec (first linemaps))
+       :total-cpu-use-info total-cpu-use-info
+       :total-mem-use-info total-mem-use-info
        :pid->proc (into {} (for [[k v] pid->proc]
                              [k (first v)]))})))
 
@@ -507,6 +564,18 @@ x
     :rest-of-str "top - 11:28:04 up  5:27,  1 user,  load average: 0.80, 0.99, 0.69"}
    {:rest-of-str "Tasks: 215 total,   1 running, 167 sleeping,   0 stopped,   0 zombie"}
    {:rest-of-str "%Cpu(s):  2.9 us,  0.2 sy,  0.0 ni, 96.9 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st"}
+   ;;{:rest-of-str "KiB Mem :  4030264 total,   547848 free,   829628 used,  2652788 buff/cache"}
+   {:rest-of-str "KiB Swap:  2097148 total,  2096624 free,      524 used.  2901400 avail Mem "}
+   {:rest-of-str ""}
+   {:rest-of-str "  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND"}
+   {:rest-of-str " 1803 andy      20   0 4152920 294476 114176 S   6.2  7.3   1:52.41 gnome-shell"}])
+;; {:error :no-total-mem-use-line, ...}
+
+(def lms
+  [{:usec 0,
+    :rest-of-str "top - 11:28:04 up  5:27,  1 user,  load average: 0.80, 0.99, 0.69"}
+   {:rest-of-str "Tasks: 215 total,   1 running, 167 sleeping,   0 stopped,   0 zombie"}
+   {:rest-of-str "%Cpu(s):  2.9 us,  0.2 sy,  0.0 ni, 96.9 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st"}
    {:rest-of-str "KiB Mem :  4030264 total,   547848 free,   829628 used,  2652788 buff/cache"}
    {:rest-of-str "KiB Swap:  2097148 total,  2096624 free,      524 used.  2901400 avail Mem "}
    {:rest-of-str ""}
@@ -532,7 +601,21 @@ x
 
 )
 
-(defn read-top-output-and-validate [fname]
+(defn read-top-output-and-validate
+  "Given a file name, read it, split it into lines, parse it with
+  parse-and-check-timestamps, break it into groups of lines starting
+  at lines that appear to be the first line of output from the 'top'
+  command according to the function top-first-output-line?, then parse
+  each group to extract some information from that instance of top
+  producing output.
+
+  If all goes well, return a sequence of maps, one for each occurrence
+  of 'top' output found for one point in time.  See
+  parse-one-top-output for the contents of these maps.
+
+  If any problems are found, return one map that contains at least the
+  keys :error and :error-data, describing the problem found."
+  [fname]
   (let [lines (->> fname slurp str/split-lines)
         lms (parse-and-check-timestamps lines)]
     (if (and (map? lms) (contains? lms :error))
@@ -552,14 +635,20 @@ x
       (println "Error while reading or parsing found:")
       (clojure.pprint/pprint top-infos))
     (let [first-ti (first top-infos)
-          last-ti (last top-infos)]
+          last-ti (last top-infos)
+          top-times (map :usec top-infos)
+          deltas (map - (rest top-times) top-times)]
       (println "Total lines:" (reduce + (map (fn [top-info]
                                                (+ (count (:top-heading-lines top-info))
                                                   (count (:top-process-lines top-info))))
                                              top-infos)))
       (println "Number of top outputs found:" (count top-infos))
       (println "Elapsed time from first to last output (sec):"
-               (/ (:usec last-ti) 1e6)))))
+               (u/usec-to-sec (:usec last-ti)))
+      (println "Elapsed times between starting each top output (sec):"
+               "min" (u/usec-to-sec (apply min deltas))
+               "avg" (u/usec-to-sec (apply u/avg deltas))
+               "max" (u/usec-to-sec (apply max deltas))))))
 
 
 (comment
@@ -602,6 +691,7 @@ ldt1
 
 (use 'clojure.pprint)
 (use 'clojure.repl)
+(require '[clojure.set :as set])
 
 (def fname "/home/andy/clj/benchmark-utils/ubuntu-18.04.5-openjdk-11.0.9.1-run1-log.txt")
 (def fname "/home/andy/clj/benchmark-utils/ubuntu-18.04.5-openjdk-11.0.9.1-run1-top.txt")
@@ -612,6 +702,32 @@ ldt1
 (def ti (read-top-output-and-validate fname))
 (summarize-top-infos ti)
 
+(def cpu-use-key-renaming
+  {:user-cpu-percent :user
+   :kernel-cpu-percent :sys
+   :niced-process-cpu-percent :nice
+   :idle-cpu-percent :idle
+   :waiting-io-cpu-percent :wait
+   :service-hardware-interrupt-cpu-percent :hwint
+   :service-software-interrupt-cpu-percent :swint
+   :time-stolen-from-this-vm-by-hypervisor-cpu-percent :stolen})
+
+(def cpus
+  (->> ti
+       (map (fn [m]
+              (-> m
+                  (assoc :sec (format "%.2f" (u/usec-to-sec (:usec m)))
+                         :tot
+                         (let [tot (reduce + (vals (:total-cpu-use-info m)))]
+                           (format "%.2f" tot)))
+                  (merge (set/rename-keys (:total-cpu-use-info m)
+                                          cpu-use-key-renaming))
+                  )))))
+(clojure.pprint/print-table [:sec :tot :user :sys :nice :wait
+                             :hwint :swint :stolen]
+                            cpus)
+(doc clojure.pprint/print-table)
+
 
 (def lines (->> fname slurp str/split-lines))
 (count lines)
@@ -620,12 +736,8 @@ ldt1
 (count lms)
 (pprint (take 4 lms))
 
-(def lmgs0 (u/partition-starting-at #(top-first-output-line? (:rest-of-str %)) lms))
-(count lmgs0)
-
-(def top-infos (map parse-one-top-output lmgs0))
-(count top-infos)
-(first (filter #(contains? % :error) top-infos))
+;; All of the deltas I saw were over 2.0 sec, averaged about 2.015
+;; sec, and one was just under 2.2 sec.
 
 ;; The total %CPU RES and %MEM values sound interesting to calculate.
 
@@ -653,20 +765,5 @@ ldt1
 ;; process?
 
 ;; What is the min, max, and avg %CPU of all other processes, total?
-
-(def top-1st-lines (filter #(top-first-output-line? (:rest-of-str %)) lms))
-(count top-1st-lines)
-(def top-2 (filter #(top-column-heading-line? (:rest-of-str %)) lms))
-(count top-2)
-(pprint (take 10 top-1st-lines))
-(def top-output-times (map :usec top-1st-lines))
-(count top-output-times)
-(def deltas (map - (rest top-output-times) top-output-times))
-(count deltas)
-(apply min deltas)
-(apply max deltas)
-;; All of the deltas I saw were over 2.0 sec, and below 2.1 sec.
-
-(/ 232864.0 4030264)
 
 )

@@ -1,6 +1,21 @@
 (ns com.andyfingerhut.bench.analyze.utils)
 
 
+(defn usec-to-sec [usec]
+  (/ usec 1e6))
+
+
+(defn avg
+  "Returns the average of the nums."
+  [& xs]
+  (double (/ (reduce + xs) (count xs))))
+
+(comment
+(avg 1 2 3)
+(avg 1 2)
+)
+
+
 (defn take-until
   "Returns a lazy sequence of successive items from coll up to and
   including the first item for which (pred item) returns logical
