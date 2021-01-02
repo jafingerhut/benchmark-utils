@@ -1,5 +1,6 @@
 (ns com.andyfingerhut.bench.analyze.results
   (:require [clojure.string :as str]
+            [clojure.pprint :as pp]
             [clojure.java.io :as io]
             [com.andyfingerhut.bench.analyze.utils :as u]))
 
@@ -462,6 +463,14 @@ x
   :top-process-lines - sequence of line maps for all other lines, one
   for each that contains statistics about one process.
 
+  :total-cpu-use-info - a map as returned by function
+  parse-top-total-cpu-use-line, the result of being called on the one
+  heading line that should recognize and parse it.
+
+  :total-mem-use-info - a map as returned by function
+  parse-top-total-mem-use-line, the result of being called on the one
+  heading line that should recognize and parse it.
+
   :pid->proc - a map from integer process id values to maps containing
   info about the process with that process id.  Each such map contains
   these keys:
@@ -490,7 +499,16 @@ x
         first-nil-proc-info (first (filter #(nil? (:process-info %))
                                            proc-infos))
         pid->proc (group-by #(get-in % [:process-info :pid]) proc-infos)
-        first-duplicate-pid (first (filter #(> (count (val %)) 1) pid->proc))]
+        first-duplicate-pid (first (filter #(> (count (val %)) 1) pid->proc))
+        tmp (map :process-info proc-infos)
+        total-resident-memory-size-kib (reduce + (map :resident-memory-size-kib
+                                                      tmp))
+        total-shared-memory-size-kib (reduce + (map :shared-memory-size-kib
+                                                    tmp))
+        total-cpu-usage-percent (reduce + (map :cpu-usage-percent
+                                               tmp))
+        total-memory-usage-percent (reduce + (map :memory-usage-percent
+                                                  tmp))]
     (cond
       (not (top-column-heading-line? (:rest-of-str (last up-to-hdr))))
       {:error :no-column-heading-line,
@@ -518,6 +536,10 @@ x
        :usec (:usec (first linemaps))
        :total-cpu-use-info total-cpu-use-info
        :total-mem-use-info total-mem-use-info
+       :total-resident-memory-size-kib total-resident-memory-size-kib
+       :total-shared-memory-size-kib total-shared-memory-size-kib
+       :total-cpu-usage-percent total-cpu-usage-percent
+       :total-memory-usage-percent total-memory-usage-percent
        :pid->proc (into {} (for [[k v] pid->proc]
                              [k (first v)]))})))
 
@@ -633,11 +655,64 @@ x
   (if (and (map? top-infos) (contains? top-infos :error))
     (do
       (println "Error while reading or parsing found:")
-      (clojure.pprint/pprint top-infos))
+      (pp/pprint top-infos))
     (let [first-ti (first top-infos)
           last-ti (last top-infos)
           top-times (map :usec top-infos)
-          deltas (map - (rest top-times) top-times)]
+          deltas (map - (rest top-times) top-times)
+          ;; Difference between (a) total mem used in summary line,
+          ;; minus (b) total RESident memory of all processes:
+          total-mem-differences
+          (map (fn [ti]
+                 (let [a (get-in ti [:total-mem-use-info :used-mem-kib])
+                       b (get ti :total-resident-memory-size-kib)]
+                   {:usec (:usec ti)
+                    :summary-used-mem-kib a
+                    :total-resident-mem-kib b
+                    :diff (- a b)}))
+               top-infos)
+          ;; Difference between (a) %MEM for a single process, minus
+          ;; (b) RESident memory of the process divided by total
+          ;; memory of the system (times 100 to make it in units of
+          ;; percent)
+          ;; tbd
+          percent-mem-differences
+          (mapcat (fn [ti]
+                    (map (fn [m]
+                           (let [pi (:process-info m)
+                                 a (:memory-usage-percent pi)
+                                 total-mem (get-in ti [:total-mem-use-info
+                                                       :total-mem-kib])
+                                 b (* 100.0 (/ (:resident-memory-size-kib pi)
+                                               total-mem))]
+                             {:usec (:usec ti)
+                              :pid (:pid pi)
+                              :mem-pct a
+                              :res-pct-of-total-mem b
+                              :diff (- a b)}))
+                         (vals (:pid->proc ti))))
+                  top-infos)
+
+          ;; TBD: Should probably print this number out in the log
+          ;; file somewhere, so it is not hard-coded in this program.
+          num-cpus 4
+
+          ;; Difference between (a) total %CPU all processes,
+          ;; minus (b) total of user and system %Cpu from summary
+          ;; line, multiplied by number of CPUs
+          total-cpu-percent-differences
+          (map (fn [ti]
+                 (let [a (get ti :total-cpu-usage-percent)
+                       cpu (get ti :total-cpu-use-info)
+                       b (* num-cpus
+                            (+ (get cpu :user-cpu-percent)
+                               (get cpu :kernel-cpu-percent)))]
+                   {:usec (:usec ti)
+                    :total-cpu-percent a
+                    :user-plus-sys-cpu b
+                    :diff (- a b)}))
+               top-infos)
+          ]
       (println "Total lines:" (reduce + (map (fn [top-info]
                                                (+ (count (:top-heading-lines top-info))
                                                   (count (:top-process-lines top-info))))
@@ -648,7 +723,46 @@ x
       (println "Elapsed times between starting each top output (sec):"
                "min" (u/usec-to-sec (apply min deltas))
                "avg" (u/usec-to-sec (apply u/avg deltas))
-               "max" (u/usec-to-sec (apply max deltas))))))
+               "max" (u/usec-to-sec (apply max deltas)))
+
+      ;; I have seen number (a) be about 1 GByte when (b) was about 2
+      ;; Gbytes, for a huge difference.  I don't know whether these
+      ;; two values are supposed to be related at all, or whether
+      ;; there might be soe other function of the stats of the
+      ;; individual processes that might be closer to (a).
+      #_(println "Difference between (a) total mem used in summary line, minus (b) total RESident memory of all processes:"
+               "min" (apply min-key :diff total-mem-differences)
+               "max" (apply max-key :diff total-mem-differences))
+
+      ;; The maximum differences I saw across several hundred outputs
+      ;; of the top command were in the range -0.05 to +0.05, which is
+      ;; exactly the range you would expect if the value in the %MEM
+      ;; column was calculated by rounding off the formula I compared
+      ;; it against, to the nearest multiple of 0.1.
+      (println "Difference between (a) %MEM for a single process, minus (b) RESident memory of the process divided by total memory of the system (times 100 to make it in units of percent):"
+               "min" (format "%.3f" (apply min (map :diff percent-mem-differences)))
+               "max" (format "%.3f" (apply max (map :diff percent-mem-differences))))
+
+      ;; I have seen huge differences between these two values, e.g.:
+      ;; (a) was 14.4%, but (b) was 4*(26.0+0.9) = 107.6%
+      ;;     %Cpu(s): 26.0 us,  0.9 sy,  0.0 ni, 73.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+      ;; in the other direction:
+      ;; (a) was 109.2%, but (b) was 4*(11.9 + 0.1) = 48.0%
+      ;;     %Cpu(s): 11.9 us,  0.1 sy,  0.0 ni, 87.8 id,  0.0 wa,  0.0 hi,  0.1 si,  0.0 st
+      ;; The top man page from Ubuntu 18.04 Linux says that both of
+      ;; these quantities are based on the most recent time period
+      ;; only, so I have no guesses why these values can differ so
+      ;; much.
+      #_(println "Difference between (a) total %CPU all processes, minus (b) total of user and system %Cpu from summary line, multiplied by number of CPUs (from /proc/cpuinfo on Linux):"
+               "min" (apply min-key :diff total-cpu-percent-differences)
+               "max" (apply max-key :diff total-cpu-percent-differences))
+      )))
+
+
+(defn summarize-top-file [m]
+  (let [fname (:fname m)
+        ti (read-top-output-and-validate fname)]
+    (summarize-top-infos ti)))
 
 
 (comment
@@ -697,6 +811,8 @@ ldt1
 (def fname "/home/andy/clj/benchmark-utils/ubuntu-18.04.5-openjdk-11.0.9.1-run1-top.txt")
 (def fname "/home/andy/clj/benchmark-utils/ubuntu-18.04.5-openjdk-11.0.9.1-run2-top.txt")
 (def fname "/home/andy/clj/benchmark-utils/ubuntu-18.04.5-openjdk-11.0.9.1-run3-top.txt")
+(def fname "/home/andy/clj/benchmark-utils/ubuntu-18.04.5-openjdk-11.0.9.1-suspend-vm-top.txt")
+(def fname "/home/andy/clj/benchmark-utils/ubuntu-18.04.5-openjdk-11.0.9.1-close-laptop-30sec-top.txt")
 
 ;; Combining some of the steps below into a few function calls:
 (def ti (read-top-output-and-validate fname))
@@ -712,19 +828,45 @@ ldt1
    :service-software-interrupt-cpu-percent :swint
    :time-stolen-from-this-vm-by-hypervisor-cpu-percent :stolen})
 
+(def total-use-key-renaming
+  {:total-resident-memory-size-kib :tot-res
+   :total-shared-memory-size-kib :tot-shr
+   :total-cpu-usage-percent :tot-%cpu
+   :total-memory-usage-percent :tot-%mem})
+
 (def cpus
   (->> ti
        (map (fn [m]
-              (-> m
-                  (assoc :sec (format "%.2f" (u/usec-to-sec (:usec m)))
-                         :tot
-                         (let [tot (reduce + (vals (:total-cpu-use-info m)))]
-                           (format "%.2f" tot)))
-                  (merge (set/rename-keys (:total-cpu-use-info m)
-                                          cpu-use-key-renaming))
-                  )))))
-(clojure.pprint/print-table [:sec :tot :user :sys :nice :wait
-                             :hwint :swint :stolen]
+              (let [total-mem-kib (get-in m [:total-mem-use-info :total-mem-kib])
+                    m (-> m
+                          (assoc :sec (u/usec-to-sec (:usec m))
+                                 :tot (reduce + (vals (:total-cpu-use-info m))))
+                          (merge (set/rename-keys (:total-cpu-use-info m)
+                                                  cpu-use-key-renaming))
+                          (set/rename-keys total-use-key-renaming)
+                          )
+                    m (-> m
+                          (assoc :user-sysx4 (* 4 (+ (:user m) (:sys m)))
+                                 :tot-res-pct (* 100.0 (/ (:tot-res m) total-mem-kib))) )
+                    m (-> m
+                          (assoc :res-pct-dif (- (:tot-res-pct m) (:tot-%mem m))))
+                    m (-> m
+                          (update :sec #(format "%.2f" %))
+                          (update :tot #(format "%.2f" %))
+                          (update :user-sysx4 #(format "%.2f" %))
+                          (update :tot-%cpu #(format "%.2f" %))
+                          (update :tot-%mem #(format "%.2f" %))
+                          (update :tot-res-pct #(format "%.2f" %))
+                          (update :res-pct-dif #(format "%.2f" %))
+                          )
+                    ]
+                m)))))
+(pprint (nth cpus 0))
+(clojure.pprint/print-table [:sec
+                             :tot :user :sys
+                             :user-sysx4 :tot-%cpu
+                             :tot-res :res-pct-dif :tot-%mem :tot-shr
+                             :nice :wait :hwint :swint :stolen]
                             cpus)
 (doc clojure.pprint/print-table)
 
@@ -739,16 +881,10 @@ ldt1
 ;; All of the deltas I saw were over 2.0 sec, averaged about 2.015
 ;; sec, and one was just under 2.2 sec.
 
-;; The total %CPU RES and %MEM values sound interesting to calculate.
-
 ;; For any process that exists in two consecutive top outputs, it
 ;; should have the same PID and at least usually the same USER and
 ;; COMMAND (although I believe those can be changed by a process's
 ;; actions).  Its TIME+ value should never decrease.
-
-;; TBD: How much correlation is there between the "KiB Mem used" value
-;; and the total of all RES values for all processes?  If they are not
-;; equal, how can they differ?  Perhaps because RES includes SHR, too?
 
 ;; TBD: Should "Tasks: <n> total" always equal the number of processes
 ;; with info printed?
@@ -756,14 +892,12 @@ ldt1
 ;; TBD: Should "<n> running" always equal the number of processes with
 ;; status "R"?
 
-;; TBD: Should "%Cpu(s): <n> us, <m> sy" total to the total %CPU of
-;; all processes?  Or some other similar total?
-
 ;; From the first top output after a JVM process running a Criterium
 ;; benchmark prints "Sampling ...", until it prints "Final GC..."
 ;; about 1 minute later, what is the min, max, and avg %CPU of that
 ;; process?
 
-;; What is the min, max, and avg %CPU of all other processes, total?
+;; What is the min, max, and avg of the total of %CPU among all other
+;; processes?
 
 )
