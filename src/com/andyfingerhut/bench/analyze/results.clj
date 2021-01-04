@@ -248,7 +248,7 @@ x
 ;; st - time stolen from this vm by the hypervisor
 
 (defn parse-top-total-cpu-use-line [s]
-  (let [m (re-find #"^\s*%Cpu\(s\):\s+(\d+\.\d+)\s+us,\s+(\d+\.\d+)\s+sy,\s+(\d+\.\d+)\s+ni,\s+(\d+\.\d+)\s+id,\s+(\d+\.\d+)\s+wa,\s+(\d+\.\d+)\s+hi,\s+(\d+\.\d+)\s+si,\s+(\d+\.\d+)\s+st\s*$"
+  (let [m (re-find #"^\s*%Cpu\(s\):\s*(\d+\.\d+)\s+us,\s+(\d+\.\d+)\s+sy,\s+(\d+\.\d+)\s+ni,\s+(\d+\.\d+)\s+id,\s+(\d+\.\d+)\s+wa,\s+(\d+\.\d+)\s+hi,\s+(\d+\.\d+)\s+si,\s+(\d+\.\d+)\s+st\s*$"
                    s)]
     (if m
       {:user-cpu-percent (Double/parseDouble (m 1))
@@ -262,7 +262,8 @@ x
 
 (comment
 (def l1 "%Cpu(s): 20.7 us,  0.5 sy,  0.0 ni, 78.8 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st")
-(pprint (parse-top-total-cpu-use-line l1))
+(def l1 "%Cpu(s):100.0 us,  0.0 sy,  0.0 ni,  0.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st")
+(pp/pprint (parse-top-total-cpu-use-line l1))
 )
 
 (defn parse-top-total-mem-use-line [s]
