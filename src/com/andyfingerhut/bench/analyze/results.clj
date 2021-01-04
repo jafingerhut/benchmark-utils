@@ -225,10 +225,12 @@ x
 
 (defn top-first-output-line? [s]
   (boolean
-   (re-find #"^\s*top\s+-\s+\S+\s+up\s+\S+\s+\d+\s+user,\s+load average:" s)))
+   (re-find #"^\s*top\s+-\s+\S+\s+up\s+.+\s+\d+\s+user,\s+load average:" s)))
 
 (comment
 (def l1 " top - 11:28:06 up  5:27,  1 user,  load average: 0.80, 0.99, 0.69")
+(def l1 " top - 20:14:33 up 4 min,  1 user,  load average: 1.40, 1.06, 0.47")
+(def l1 " top - 09:40:33 up 1 day, 28 min,  1 user,  load average: 0.16, 0.32, 0.37")
 (top-first-output-line? l1)
 )
 
@@ -501,6 +503,15 @@ x
         pid->proc (group-by #(get-in % [:process-info :pid]) proc-infos)
         first-duplicate-pid (first (filter #(> (count (val %)) 1) pid->proc))
         tmp (map :process-info proc-infos)
+        ;; Extra debug output if there is a line that has
+        ;; no :resident-memory-size-kib key, to more quickly isolate
+        ;; the problem.
+        _ (when-not (every? #(contains? % :resident-memory-size-kib) tmp)
+            (pp/pprint
+             (first (remove (fn [pi]
+                              (contains? (get pi :process-info)
+                                         :resident-memory-size-kib))
+                            proc-infos))))
         total-resident-memory-size-kib (reduce + (map :resident-memory-size-kib
                                                       tmp))
         total-shared-memory-size-kib (reduce + (map :shared-memory-size-kib
